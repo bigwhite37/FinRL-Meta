@@ -145,3 +145,4 @@ price_array.npy
 
 # vscode
 /.vscode
+tensorboard_log/

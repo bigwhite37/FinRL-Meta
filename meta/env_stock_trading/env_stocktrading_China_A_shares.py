@@ -81,6 +81,11 @@ class StockTradingEnv(gym.Env):
         self.date_memory = [self._get_date()]
         self._seed()
 
+        # 在 __init__ 方法中添加调试信息
+        print("DataFrame columns:", self.df.columns.tolist())
+        print("DataFrame index name:", self.df.index.name)
+        print("First day data:", self.data)
+
     def _sell_stock(self, index, action):
         def _do_sell_normal():
             if self.state[index + 1] > 0:
@@ -430,9 +435,29 @@ class StockTradingEnv(gym.Env):
 
     def _get_date(self):
         if len(self.df.tic.unique()) > 1:
-            date = self.data.date.unique()[0]
+            # 检查日期列的可能位置
+            if hasattr(self.data, 'index') and hasattr(self.data.index, 'unique'):
+                # 如果日期可能是索引
+                date = self.data.index.unique()[0]
+            elif 'date' in self.data:
+                date = self.data.date.unique()[0]
+            elif 'time' in self.data:
+                date = self.data.time.unique()[0]
+            else:
+                # 返回一个默认值或当前的日期
+                from datetime import datetime
+                date = str(datetime.now().date())
         else:
-            date = self.data.date
+            # 同样检查单只股票的情况
+            if hasattr(self.data, 'index'):
+                date = self.data.index
+            elif 'date' in self.data:
+                date = self.data.date
+            elif 'time' in self.data:
+                date = self.data.time
+            else:
+                from datetime import datetime
+                date = str(datetime.now().date())
         return date
 
     def get_portfolio_df(self):
@@ -510,7 +535,8 @@ class StockTradingEnv(gym.Env):
         market_values_each_tic = 0.5 * self.initial_amount // len(prices)
         buy_nums_each_tic = [int(market_values_each_tic // p) for p in prices]
         if self.hundred_each_trade:
-            buy_nums_each_tic = buy_nums_each_tic // 100 * 100
+            # buy_nums_each_tic = buy_nums_each_tic // 100 * 100
+            buy_nums_each_tic = [num // 100 * 100 for num in buy_nums_each_tic]
 
         buy_amount = sum(np.array(prices) * np.array(buy_nums_each_tic))
 

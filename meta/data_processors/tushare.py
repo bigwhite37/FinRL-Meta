@@ -172,14 +172,44 @@ class ReturnPlotter:
         self.start = start_date
         self.end = end_date
         self.trade = df_trade
-        self.df_account_value = df_account_value
+        self.df_account_value = df_account_value.copy()
+
+        # 检查并确保有 'time' 列
+        if 'date' in self.df_account_value.columns and 'time' not in self.df_account_value.columns:
+            self.df_account_value.rename(columns={'date': 'time'}, inplace=True)
+
+    # def get_baseline(self, ticket):
+    #     df = ts.get_hist_data(ticket, start=self.start, end=self.end)
+    #     df.loc[:, "dt"] = df.index
+    #     df.index = range(len(df))
+    #     df.sort_values(axis=0, by="dt", ascending=True, inplace=True)
+    #     df["time"] = pd.to_datetime(df["dt"], format="%Y-%m-%d")
+    #     return df
 
     def get_baseline(self, ticket):
-        df = ts.get_hist_data(ticket, start=self.start, end=self.end)
-        df.loc[:, "dt"] = df.index
-        df.index = range(len(df))
-        df.sort_values(axis=0, by="dt", ascending=True, inplace=True)
-        df["time"] = pd.to_datetime(df["dt"], format="%Y-%m-%d")
+        # 设置token（确保token已设置）
+        ts.set_token(self.token)
+        pro = ts.pro_api()
+
+        # 处理指数代码格式
+        if ticket == "399300":
+            index_code = "399300.SZ"
+        elif ticket == "000016":
+            index_code = "000016.SH"
+        else:
+            index_code = ticket
+
+        # 获取指数日线数据
+        df = pro.index_daily(ts_code=index_code,
+                            start_date=self.start.replace('-', ''),
+                            end_date=self.end.replace('-', ''))
+
+        # 转换数据格式以匹配原有代码
+        if not df.empty:
+            df = df.rename(columns={'trade_date': 'dt', 'vol': 'volume'})
+            df['time'] = pd.to_datetime(df['dt'])
+            df.sort_values(by='time', ascending=True, inplace=True)
+            df.reset_index(drop=True, inplace=True)
         return df
 
     def plot(self, baseline_ticket=None):
@@ -190,7 +220,7 @@ class ReturnPlotter:
         """
         baseline_label = "Equal-weight portfolio"
         tic2label = {"399300": "CSI 300 Index", "000016": "SSE 50 Index"}
-        if baseline_ticket:
+        if (baseline_ticket):
             # 使用指定ticket作为baseline
             baseline_df = self.get_baseline(baseline_ticket)
             baseline_date_list = baseline_df.time.dt.strftime("%Y-%m-%d").tolist()
